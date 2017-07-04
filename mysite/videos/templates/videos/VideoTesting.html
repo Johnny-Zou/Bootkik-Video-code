@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>{{video.title}}</title>
+	<!--This script loads in the Vimeo Api-->
+	<script src="https://player.vimeo.com/api/player.js"></script>
+	<!--This script loads in the jQuery-->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<!--This script loads in the Font Awesome Icon pack-->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+	<!--THIS IS ALL THE CSS FOR THE PROGRESS BAR-->
+	<style>
+		html,body{
+			max-width: 100%;
+			overflow: hidden;
+		}
+		*{
+			padding: 0;
+			margin: 0;
+			border: 0;
+		}
+		#vimeoVideo{
+			width: 100vw;
+			height: 100vh;
+		}
+		#vimeoVideo > * {
+			width: 100%;
+			height: 100%;
+		}
+		#progressbar{
+			position: absolute;
+			top: calc(100% - 70px);
+			height: 70px;
+			width: 100vw;
+			user-select: none;
+		}
+
+		#clickCatch{
+			position: absolute;
+			width: 100%;
+			height:100%;
+			z-index: 2;	
+			background-color: white;
+			opacity: 0;
+		}
+
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		#fill{{forloop.counter}}{
+			width: {{tag.getPercent}}vw;
+			height: 50px;
+		}
+		{% endif %}{% endfor %}
+
+		.backgroundseen{
+			/*This is the grey*/
+			background-color: #E4E4E4;
+			display: inline-block;		
+			user-select: none;	
+		}
+		.backgroundunseen{
+			/*This is the light red*/
+			background-color: #FF7A7C;
+			display: inline-block;
+			user-select: none;
+		}
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		#tag{{forloop.counter}}{
+			display: inline-block;
+			position: relative;
+			top: 20px;
+			user-select: none;
+		}
+		{% endif %}{% endfor %}
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		.title{{forloop.counter}}{
+			display: inline-block;
+			position: relative;
+			height: 100%;
+			width: calc({{tag.getPercent}}vw - 10px);
+			z-index: 2;
+			background-color: transparent;
+			padding-left: 10px;
+			padding-top: 10px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			vertical-align: top;
+			white-space: nowrap;
+			user-select: none;
+		}
+		{% endif %}{% endfor %}
+		.animated{
+			position: absolute;
+			height: 100%;
+			width: 0px;
+			z-index: 1;
+			top: 0;
+			user-select: none;
+		}
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		.inProgress{{forloop.counter}}{
+			width: 0px;
+			/*THIS SHOULD BE THE BLUE*/
+			background-color: #68C1FF;
+			/*This is needed to get rid of the flickering background on chrome*/
+			-webkit-backface-visibility: hidden;
+			user-select: none;
+		}
+		{% endif %}{% endfor %}
+
+		.clickable{
+			cursor: pointer;
+		}
+
+		#progressbar .active {
+			height: 70px;
+		}
+		#progressbar .activeTag {
+			top: 0px;
+		}
+	</style>
+	
+	<!--THIS IS THE CSS FOR THE NEXT BUTTON -->	
+	<style>
+		#nextButton{
+			background-color: #68C1FF;
+			width: 5vw;
+			height: 50px;
+			display: inline-block;
+			position: relative;
+			top: 20px;
+		}
+
+		#nextIcon{
+			display: inline-block;
+			position: relative;
+			width: 24px;
+			top: calc(50% - 12px);
+			left: calc(50% - 12px);
+			overflow: hidden;
+			vertical-align: top;
+			user-select: none;
+		}
+
+	</style>
+
+	<!--THIS IS THE CSS FOR THE BUFFERING ANIMATION -->
+	<style>
+
+		#loader-wrapper {
+			position: absolute;
+			top: 50vh;
+			left: 50vw;
+			height: 80px;
+			width: 80px;
+			transform: translate(-40px,-40px);
+			background-color: transparent;
+			z-index: 1001;
+		}
+
+		.rotate {
+			animation: rotate 1s linear infinite;
+			transform-origin: 50% 50%;
+		}
+		.circle{
+		    position: relative;
+		    margin: 10px auto;
+		    width: 40px; height: 40px;
+		    border-radius: 50%;
+		    background: transparent;
+		    border: 5px solid transparent;
+		    border-top-color: white;
+		    border-right-color: white;
+		    border-bottom-color: white;
+		}
+		@keyframes rotate {
+			from {transform: rotate(0deg);}
+			to {transform: rotate(360deg);}
+		}
+
+	</style>
+
+	<!-- THIS IS THE CSS FOR THE COMMENTS SLIDE OUT IT IS CURRENTLY NOT IN USE-->
+	<!--
+	<style>
+		#comments{
+			position: absolute;
+			z-index: 2000;
+			top: 0;
+			right: 0;
+			transition: 0.5s;
+		}
+		#comments.clicked{
+			top: 0;
+			right: 600px;
+		}
+		
+		#commentIcon{
+			background-color: white;
+			color: black;
+			height: 40px;
+			width: 40px;
+			text-align: center;
+			position: absolute;
+			left: -40px;
+			top: calc(50vh - 27.5px);
+			opacity: 0.3;
+		}
+		#commentIcon:hover{
+			opacity: 1;
+		}
+		{% comment %}
+		#commentIcon{
+			background-color: white;
+			color: black;
+			height: 90px;
+			width: 30px;
+			text-align: center;
+			position: absolute;
+			left: -30px;
+			top: calc(50vh - 45px);
+			opacity: .3;
+		}
+		#commentIcon:hover{
+			opacity: 1;
+		}
+		#commentRotate{
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform:  translateX(-50%) translateY(-50%) rotate(90deg);
+		}
+		{% endcomment %}
+		#commentIframe{
+			height: 100vh;
+			width: 600px;
+			background-color: white;
+			position: absolute;
+		}
+	</style>
+	-->
+
+	<!-- THIS IS THE CSS FOR THE PROGRESS BAR BUBBLE -->
+	<style>
+		#bubble{
+			position: relative;
+			width: 8px;
+			height: 8px;
+			border-radius: 4px;
+			background: lightblue;
+			z-index: 1999;
+		}
+		#bubbleContainer{
+			position: absolute;
+			top: calc(100% - 74px);
+			left: -4px;
+			height: 8px;
+			width: 8px;
+			z-index: 1999;
+		}
+
+		#bubble.hoveringProgress{
+			width: 16px;
+			height: 16px;
+			border-radius: 8px;
+		}
+		#bubbleContainer.hoveringProgressContainer{
+			top: calc(100% - 78px);
+			left: -8px;
+			width: 16px;
+			height: 16px;
+		}
+	</style>
+
+</head>
+
+<body>
+	<!--This div is overlayed on the entire visible window in order to catch clicks onto the video to play/pause the video on click-->
+	<div id="clickCatch"></div>
+
+	<!--This div shows the buffering circle -->
+	<div id="loader-wrapper">
+		<div class="circle rotate"></div>
+	</div>
+
+	<!--This is the main iframe for the entire video -->
+	<iframe id="vimeoVideo" src="https://player.vimeo.com/video/{{video.vimeo_id}}?background=1" frameborder="0"></iframe>
+
+	<!--This is the div for the progress bar at the bottom of the screen -->
+	<div id="progressbar">
+	{% for tag in tagList %}{% if '1' in tag.title %}<div class="tag clickable" id="tag{{forloop.counter}}"><div class="background{{tag.status}}" id="fill{{forloop.counter}}"><div class="animated inProgress{{forloop.counter}}" id="progressAnimation{{forloop.counter}}"></div><div class="title{{forloop.counter}}">{{tag.title|slice:"1:"}}</div></div></div>{% endif %}{% endfor %}<div id="nextButton"><i id="nextIcon" class="fa fa-step-forward" style="font-size:24px"></i></div></div>
+
+	<!-- THIS IS THE HTML CODE FOR THE BUBBLE -->
+	<div id="bubbleContainer">
+		<div id="bubble"></div>
+	</div>
+
+	<!-- THIS IS THE HTML CODE FOR THE COMMENT POPUP THAT IS CURRENTLY NOT IN USE-->
+
+	<!--
+	<div id="comments">
+		<div id="commentIcon">
+		
+		<i class="fa fa-commenting-o" style="font-size:36px"></i>
+		{% comment %}
+		<h4 id="commentRotate">Comments</h4>
+		{% endcomment %}
+		</div>
+		<div id="commentIframe">THIS IS WHERE THE COMMENTS WOULD GO</div>
+	</div>
+	
+	<script type="text/javascript">			
+		$('#commentIcon').on('click', function() {
+		    $('#comments').toggleClass('clicked');
+		    if($('#comments').hasClass('clicked')){
+		    	$('#commentIcon').css("opacity","1");
+		    }
+		    else{
+		    	$('#commentIcon').css("opacity","0.3");
+		    }
+		});
+	</script>
+	-->
+
+	<script type="text/javascript">
+		//These are global variables accessable by everything
+		var bubbleRadius = 4;
+		var isDown = false;
+	$(document).ready(function() {
+		//setting up the Vimeo API
+		var vimeoIframe = document.querySelector('iframe');
+		var player = new Vimeo.Player(vimeoIframe);
+
+		//initializing and declaring variables for when the video first plays
+		var maxPlayingTags = {{video.numTags}};
+		var currentTag = 1;
+		var previousTag = 1;
+		var startedTag = false; //ensure that the tag does not become a "watched" tag unless the user watches the entire thing
+		var bubbleTime;
+		
+		//START THE FIRST TAG WITH ACTIVE
+		activateTag(1);
+
+		//WHEN THE VIDEO STARTS PLAYING, ONLY RUNS THE FIRST TIME AROUND
+		player.on('play', function(){
+			console.log('video is playing!');
+			//since background=1 for vimeo API to hide the controls, we have to manually turn on sound and set loop to false
+			player.setVolume(1);
+			player.setLoop(false);
+			player.off('play');//turn off this event listener after first run
+		});
+
+		//THIS IS THE CODE FOR THE BUBBLE
+		//DRAG THE BUBBLE TO MOVE
+		var isDownBody = false; //checks if mouseDown
+		var cursorX; //sets the cursor X-axis location
+		var seeking = false;
+
+		//attach mouse event listeners to the bubbleContainer
+	    $("#bubbleContainer")
+	    .mousedown(function() {
+	        isDown = true;
+	    })
+	    .mouseup(function() {
+	        isDown = false;
+	        //bubbleTime is only declared when mouse has been moved, checks if bubbleTime is defined and if the user wants to seek, then seek to the bubbleTime
+	        if(typeof bubbleTime != 'undefined' && seeking == true){
+	        	seekTo(bubbleTime);
+	        	seeking = false;
+	        }
+	    });
+	    
+	    //attach mouse move event listeners to the body
+	    $("body")
+	    .mouseup(function() {
+	        isDown = false;
+	        if(typeof bubbleTime != 'undefined' && seeking == true){
+	        	seekTo(bubbleTime);
+	        	seeking = false;
+	        }
+	    })
+		.mousemove(function(event) {
+			//console.log("bubbleClicked: " + isDown);
+			//console.log("bodyClicked: " + isDownBody);
+
+			//if mouse is clicked down on the bubble, then update the position of the bubble to the mouse
+	    	if(isDown == true){
+	    		cursorX = event.clientX; //store the mouse's X-axis location
+	    		//only move the cursor if the mouse location is between 0 and 95vw which is the end of the tags in the progress bar
+	    		if(cursorX >=0 && cursorX <= document.documentElement.clientWidth / 100 * 95){
+		    		bubbleTime = (cursorX / (document.documentElement.clientWidth / 100 * 95)) * {{video.getLargestTag}};
+		    		//console.log("bubble: " + bubbleTime);
+		    		//console.log("cursor: " + cursorX);
+
+		    		//update the bubble location
+		    		$("#bubbleContainer").css("left",cursorX - bubbleRadius);
+		    		startedTag = false; //if user seeks forward, do not allow them to learn tags
+		    		seeking = true;
+		    	}
+	    	}
+	    });
+
+		//Variables for the bubble seek function
+		var seekPreviousTag;
+		var seekNewTag;
+		//This function seeks the video to the bubbleTime
+	    function seekTo(bubbleTime){
+	    	//BUBBLE SEEK
+    		player.setCurrentTime(bubbleTime).then(function(seconds) {
+				console.log('successfully seeked to ' + seconds);
+			}).catch(function(error) {
+				console.log('an error occured with seeking in the video');
+			});
+
+			//set the width of the "inProgress" div to correct position based off of where the video was just seeked to
+			{% for tag in tagList %}{% if '1' in tag.title %}
+				if(bubbleTime >= {{tag.start}} && bubbleTime <= {{tag.end}}){
+					seekPreviousTag = currentTag;
+					seekNewTag = {{forloop.counter}};
+
+					tagProgressPercent{{forloop.counter}} = (currentTime - {{tag.start}}) / {{tag.length}} * 100;
+					$('.inProgress{{forloop.counter}}').css("width",tagProgressPercent{{forloop.counter}} + "%");
+
+				}
+			{% endif %}{% endfor %}
+			//Only remove the "active" class (raised tag) if the user seeked to a new tag
+			if(seekNewTag != seekPreviousTag){
+				activateTag(seekNewTag);
+				deactivateTag(seekPreviousTag);
+			}
+	    }
+
+
+		//THIS FUNCTION RUNS EVERY 50MS AND KEEPS CHECKING FOR VARIABLE CHANGES
+		var currentTime = 0; //updates 25ms after this function runs
+		var previousTime = 0; //updates 1ms after this function runs
+		//this way there will always be a difference of around 24ms between currentTime and previousTime IF THE VIDEO WAS PLAYING. If previous = current then the video is PAUSED OR BUFFERING
+
+		var buffering = false;
+		var pausedVideo = false;
+		var gotPreviousTime = false;
+		var gotNextTime = false;
+		window.setInterval(function(){
+			//GET THE PREVIOUS TIME
+			if(gotPreviousTime == false){
+				setTimeout(function(){
+					player.getCurrentTime().then(function(seconds){
+						previousTime = seconds;
+						gotPreviousTime = true;
+					}).catch(function(error){
+						console.log('An error occured when fetching the previous time');
+					})
+				}, 1)
+			}
+			//GET THE CURRENT TIME 25 ms Later
+			if(gotNextTime == false){
+				setTimeout(function(){
+					player.getCurrentTime().then(function(seconds){
+						currentTime = seconds;
+						gotNextTime = true;
+					}).catch(function(error){
+						console.log('An error occured when fetching the current time');
+					})
+			}, 25)
+			}
+
+			//COMPARE THE TIMES
+			if(gotNextTime == true && gotPreviousTime == true){
+				//BUFFERING LOGIC
+				if(previousTime == currentTime){
+					if(pausedVideo == false){
+						if(currentTime >= {{video.getLargestTag}}){
+							//THIS OCCURS WHEN THE VIDEO IS DONE PLAYING
+							buffering = false;
+						}
+						else{
+							//Video is not paused yet, current = previous
+							buffering = true;
+						}
+					}
+					else{
+						//video is paused
+						buffering = false;
+					}
+				}
+				else{
+					//video is playing
+					buffering = false;
+				}
+
+				//BUFFERING ANIMATION
+				//console.log("Time previous: " + previousTime);
+				//console.log("current time: " + currentTime);
+				//console.log("current tag: " + currentTag);
+
+
+				if(pausedVideo == true){
+				//if paused hide buffering animation
+					//console.log("status: Paused");
+					$('#loader-wrapper').fadeOut(100); //if paused hide buffering animation
+				}
+				else if(pausedVideo == false){
+				//if not paused
+					if(buffering == true){
+					//and buffering is true show buffering animation
+						//console.log("status: Buffering");
+						$('#loader-wrapper').fadeIn(100);
+					}
+					else{
+					//and buffering is false hide buffering animation
+						//console.log("status: Playing")
+						$('#loader-wrapper').fadeOut(100);
+					}
+				}
+				//console.log('');
+
+				{% for tag in tagList %}{% if '1' in tag.title %}
+				var tagProgressPercent{{forloop.counter}};
+				var inProgressDoneBool{{forloop.counter}} = false;
+
+				//FINISHING THE ANIMATION ON ONE FILL STARTS THE ANIMATION ON THE NEXT
+				if(currentTime >= {{tag.start}} && currentTime < {{tag.end}}){
+					if(currentTime + 0.25 >= {{tag.end}} && currentTag == {{forloop.counter}}){
+						//since update ticks are every 50ms and could skip exactly 100% width, round current time up by 0.25seconds to be safe
+				  		if(inProgressDoneBool{{forloop.counter}} == false){
+				  			//if withit 0.25seconds set the widht of the InProgress to 100%, which then triggers the next tag to start animating
+				  			$('.inProgress{{forloop.counter}}').css("width","100%");
+					  		console.log("the animation for the {{forloop.counter}} tag is done");
+				    		//start the next box
+				    		if( {{forloop.counter|add:1}} <= maxPlayingTags){
+				    			//This code runs as long as it is not the last tag
+				    			previousTag = {{forloop.counter}};
+				    			currentTag = {{forloop.counter|add:1}};
+
+				    			activateTag(currentTag); //activate the next tag, set width of InProgress animation to 0%
+								$('.inProgress' + currentTag).css("width", "0%");
+								deactivateTag(previousTag); //deactivate the previous tag
+								if(startedTag == true){
+									//if the user watched from start to finish, change "unwatched" tag to "watched" tag
+									$('#fill' + previousTag).removeClass('backgroundunseen');
+									$('#fill' + previousTag).addClass('backgroundseen');
+								}
+				    	 	}
+				    	 	else{
+				    	 		//THIS LINE OF CODE RUNS RIGHT AFTER THE LAST TAG IS FINISHED
+				    	 		console.log('video has finished');
+				    	 		previousTag = currentTag;
+				    	 		deactivateTag(previousTag);//deactivate the last tag finished
+				    	 		if(startedTag == true){//if the user watched from start to finish, change "unwatched" tag to "watched" tag
+									$('#fill' + previousTag).removeClass('backgroundunseen');
+									$('#fill' + previousTag).addClass('backgroundseen');
+								}
+				    	 	}
+				    	 	inProgressDoneBool{{forloop.counter}} = true;//makes sure that this only runs once per tag finish
+				    	}
+					}
+					else if ($('.inProgress{{forloop.counter}}').css("width") != $('#fill{{forloop.counter}}').css("width")){
+						//if the tag is not finished, update the progress bar width
+						tagProgressPercent{{forloop.counter}} = (currentTime - {{tag.start}}) / {{tag.length}} * 100;
+						$('.inProgress{{forloop.counter}}').css("width",tagProgressPercent{{forloop.counter}} + "%");
+					}
+				}
+				if(currentTime >= {{tag.start}} && currentTime <= {{tag.start}} + 1){
+					startedTag = true; //if current time is within 1 second of the starting point of the tag, set startedTag = true so that if the user finishes the tag without seeking, the tag will be converted to a "watched" tag
+				}
+				{% endif %}{% endfor %}
+
+				//FOLLOW PROGRESS FOR BUBBLE
+				if(isDown == false){
+					//when the bubble is not being clicked, change the position to follow the progress of the video
+					spot = currentTime / {{video.getLargestTag}};
+					$("#bubbleContainer").css("left","calc( " + spot + " * 95vw - " + bubbleRadius + "px");
+				}
+
+				//UPDATE THE CURRENT TAG VARIABLE
+				{% for tag in tagList %}{% if '1' in tag.title %}
+					if(currentTime >= {{tag.start}} && currentTime <= {{tag.end}}){
+						currentTag = {{forloop.counter}};
+					}
+				{% endif %}{% endfor %}
+
+				//RESET FOR NEXT TICK
+				gotNextTime = false;
+				gotPreviousTime = false;
+			}
+				//HOVER ANIMATIONS FOR THE BUBBLE
+				if(progressBarHover == true || bubbleHover == true || isDown == true){
+					enlargeBubble();
+				}
+				else {
+					reduceBubble();
+				}
+		
+		}, 30);
+
+		//CLICKING THE VIDEO ITSElF TOGGLES THE PLAY STATE OF THE VIDEO HERE
+		$('#clickCatch').on("click", function() {
+			//toggle pause/play on the video when clicking the video itself
+			player.getPaused().then(function(paused){
+				if(paused){
+					//if the video is paused, then play the video when clicked
+					player.play();
+					pausedVideo = false;
+					console.log('video is playing');
+				}
+				else{
+					//if the video is running, pause the video when clicked
+					player.pause();
+					pausedVideo = true;
+					console.log('video is paused');
+				}
+			}).catch(function(error){
+				console.log("an error occured with pausing the video");
+			});
+		});
+
+		//CLICKING THE TAGS PAUSES THE VIDEO
+		var clickedTag;//stores which tag was just clicked
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		$('#tag{{forloop.counter}}').on("click", function(){
+			clickedTag = {{forloop.counter}}; //set the clicked tag to whatever tag was just clicked
+			console.log("tag{{forloop.counter}} was clicked");
+			if (currentTag == clickedTag){
+				//if the tag just clicked was the current running tag, then toggle play/pause on the video
+				player.getPaused().then(function(paused){
+					if(paused){
+						player.play();
+						pausedVideo = false;
+						console.log('video is playing');
+					}
+					else{
+						player.pause();
+						pausedVideo = true;
+						console.log('video is paused');
+					}
+				}).catch(function(error){
+					console.log("an error occured with pausing the video")
+				});
+			}
+			else {
+				//PAUSE THE PREVIOUS TAG AND REMOVE ACTIVE STATUS ON THE PREVIOUS TAG
+				deactivateTag(currentTag); //remove active status before updating this variable
+				//ADD ACTIVE STATUS TO next
+				activateTag(clickedTag);
+				$('.inProgress' + clickedTag).css("width", "0%");
+				inProgressDoneBool{{forloop.counter}} = false;
+
+				//seek to the newly clicked tag's start time
+				player.setCurrentTime({{tag.start}}).then(function(seconds) {
+					console.log('successfully seeked to ' + seconds);
+				}).catch(function(error) {
+					console.log('an error occured with seeking in the video');
+				});
+				
+			}
+		});
+		{% endif %}{% endfor %}
+	  	
+	});
+		//THIS FUNCTION ADDS ADDITIONAL HEIGHT TO THE TAG THAT IS CURRENTLY ACTIVE
+		function activateTag(tag){
+			$('#fill' + tag).addClass('active');
+			$('#tag' + tag).addClass('activeTag');
+		}
+		//THIS FUNCTION REDUCES THE HEIGHT TO NORMAL ON TAGS THAT WERE RECENTLY ACTIVE
+		function deactivateTag(tag){
+			$('#fill' + tag).removeClass('active');
+			$('#tag' + tag).removeClass('activeTag');
+		}
+
+		//ON HOVER EVENT LISTENER FOR THE PROGRESS BAR
+		var progressBarHover = false;
+		$("#progressbar").hover(function(){
+			progressBarHover = true;
+		},function(){
+			progressBarHover = false;
+		});
+
+		//ON HOVER EVENT LISTENER FOR THE TINY BUBBLE
+		var bubbleHover = false;
+		$("#bubbleContainer").hover(function(){
+			bubbleHover = true;
+		},function(){
+			bubbleHover = false;
+		});
+
+		//THIS FUNCTION MAKES THE BUBBLE LARGER
+		function enlargeBubble(){
+			bubbleRadius = 8;
+			$("#bubble").addClass("hoveringProgress");
+			$("#bubbleContainer").addClass("hoveringProgressContainer");
+		}
+		//THIS FUNCTION MAKES THE BUBBLE SMALLER
+		function reduceBubble(){
+			bubbleRadius = 4;
+			$("#bubble").removeClass("hoveringProgress");
+			$("#bubbleContainer").removeClass("hoveringProgressContainer");
+		}
+
+		//DOESNT WORK XSS ERROR (WAS PLAYING AROUND WITH THE VIDEO SPEED BUT DID NOT QUITE GET THIS WORKING AS IFRAME IS DIFFERENT DOMAIN)
+		function setPlaySpeed(speed){
+	  		var v = $("#vimeoVideo").contents().find('video');
+	  		//var v = document.querySelector('video'); 
+	  		v.playbackRate = parseFloat(speed)﻿;  
+	  	}
+	</script>
+
+</body>
+</html>

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>{{video.title}}</title>
+	<script src="https://player.vimeo.com/api/player.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+	<style>
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		@keyframes progress{{forloop.counter}}{
+			from{width: 0px;}
+			to{width: {{tag.getPercent}}vw;}
+		}
+		{% endif %}{% endfor %}
+
+		html,body{
+			max-width: 100%;
+			
+		}
+		*{
+			padding: 0;
+			margin: 0;
+			border: 0;
+		}
+		#vimeoVideo{
+			width: 100vw;
+			height: 100vh;
+		}
+		#vimeoVideo > * {
+			width: 100%;
+			height: 100%;
+		}
+		#progressbar{
+			position: absolute;
+			top: calc(100% - 70px);
+			height: 70px;
+			width: 100vw;
+		}
+
+		#clickCatch{
+			position: absolute;
+			width: 100%;
+			height:100%;
+			z-index: 2;	
+			background-color: white;
+			opacity: 0;
+		}
+
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		#fill{{forloop.counter}}{
+			width: {{tag.getPercent}}vw;
+			height: 50px;
+		}
+		{% endif %}{% endfor %}
+
+		.backgroundseen{
+			/*This is the grey*/
+			background-color: #E4E4E4;
+			display: inline-block;			
+		}
+		.backgroundunseen{
+			/*This is the light red*/
+			background-color: #FF7A7C;
+			display: inline-block;
+		}
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		#tag{{forloop.counter}}{
+			display: inline-block;
+			position: relative;
+			top: 20px;
+			width: {{tag.getPercent}}vw;
+		}
+		{% endif %}{% endfor %}
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		.title{{forloop.counter}}{
+			display: inline-block;
+			position: relative;
+			height: 100%;
+			width: calc({{tag.getPercent}}vw - 10px);
+			z-index: 2;
+			background-color: transparent;
+			padding-left: 10px;
+			padding-top: 10px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			vertical-align: top;
+			white-space: nowrap;
+		}
+		{% endif %}{% endfor %}
+		.animated{
+			position: absolute;
+			height: 100%;
+			width: 0px;
+			z-index: 1;
+			top: 0;
+		}
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		.inProgress{{forloop.counter}}{
+			animation: progress{{forloop.counter}} {{tag.length}}s linear 0s 1 forwards;
+			animation-play-state: paused;
+			/*THIS SHOULD BE THE BLUE*/
+			background-color: #68C1FF;
+			/*This is needed to get rid of the flickering background on chrome*/
+			-webkit-backface-visibility: hidden;
+		}
+		{% endif %}{% endfor %}
+
+		.clickable{
+			cursor: pointer;
+		}
+
+		#progressbar .active {
+			height: 70px;
+		}
+		#progressbar .activeTag {
+			top: 0px;
+		}
+		#loader-wrapper {
+			position: absolute;
+			top: 50vh;
+			left: 50vw;
+			height: 80px;
+			width: 80px;
+			transform: translate(-40px,-40px);
+			background-color: transparent;
+			z-index: 1001;
+		}
+
+		.rotate {
+			animation: rotate 1s linear infinite;
+			transform-origin: 50% 50%;
+		}
+		.circle{
+		    position: relative;
+		    margin: 10px auto;
+		    width: 40px; height: 40px;
+		    border-radius: 50%;
+		    background: transparent;
+		    border: 5px solid transparent;
+		    border-top-color: white;
+		    border-right-color: white;
+		    border-bottom-color: white;
+		}
+		@keyframes rotate {
+			from {transform: rotate(0deg);}
+			to {transform: rotate(360deg);}
+		}
+
+	</style>
+
+</head>
+<body>
+
+{% comment %}
+{% for tag in tagList %}
+	{% if '1' in tag.title %}
+	<h1>{{tag.getPercent}}</h1>
+	{% endif %}
+	{% endfor %}
+{% endcomment %}
+	<div id="clickCatch"></div>
+
+	<div id="loader-wrapper">
+		<div class="circle rotate"></div>
+
+	</div>
+
+	<iframe id="vimeoVideo" src="https://player.vimeo.com/video/{{video.vimeo_id}}?background=1" frameborder="0"></iframe>
+	<div id="progressbar">
+
+	{% for tag in tagList %}{% if '1' in tag.title %}<div class="tag clickable" id="tag{{forloop.counter}}" tooltip=""><div class="background{{tag.status}}" id="fill{{forloop.counter}}"><div class="animated inProgress{{forloop.counter}}" id="progressAnimation{{forloop.counter}}"></div><div class="title{{forloop.counter}}">{{tag.title|slice:"1:"}}</div></div></div>{% endif %}{% endfor %}</div>
+
+	<script type="text/javascript">
+
+	$(document).ready(function() {
+		var windowWidth = $(window).width();
+		var windowHeight = $(window).height();
+
+		var vimeoIframe = document.querySelector('iframe');
+		var player = new Vimeo.Player(vimeoIframe);
+
+		var maxPlayingTags = {{video.numTags}};
+		var nextTag = 1;
+		var TagString;
+		var previousTag = 1;
+		var concatedString;
+		var videoLength;
+
+		
+		//START THE FIRST TAG WITH ACTIVE
+		$('#fill1').addClass('active');
+		$('#tag1').addClass('activeTag');
+
+		//WHEN THE VIDEO STARTS PLAYING, ONLY RUNS THE FIRST TIME AROUND
+		player.on('play', function(){
+			console.log('video is playing!');
+			player.setVolume(1);
+			player.setLoop(false);
+			videoLength = player.getDuration();
+			console.log('successfully got the video total duration');
+			player.off('play');
+
+		});
+
+		var firstTime = true;
+		//TIME UPDATE, RUNS EVERY TIME THE TIME UPDATES
+		player.on('timeupdate', function(data){
+			if(data.seconds > 0 && firstTime == true){
+				//RUNS THE FIRST TIME AROUND
+				//START THE ANIMATION ON THE FIRST FILLER
+				$('.inProgress1').css("animation-play-state","running");
+				console.log('animation on one should be running');
+				firstTime = false;
+			}
+			//console.log(data.seconds);
+		});
+
+		//THIS FUNCTION CHECKS THE CURRENT TIME AND COMPARES IT WITH THE TIME 300 ms AGO, IF THE TIME IS THE SAME,THE VIDEO IS NOT PLAYING, IF THE TIME IS DIFFERENT, THE VIDEO IS PLAYING
+		var nextTime = 0;
+		var previousTime = 0;
+		var buffering = false;
+		var pausedVideo = false;
+		window.setInterval(function(){
+				player.getCurrentTime().then(function(seconds){
+					previousTime = seconds;
+				}).catch(function(error){
+					console.log('An error occured when fetching the previous time');
+				})
+
+			setTimeout(function(){
+				player.getCurrentTime().then(function(seconds){
+				nextTime = seconds;
+				}).catch(function(error){
+					console.log('An error occured when fetching the current time');
+				})
+
+				if(previousTime == nextTime){
+					if(pausedVideo == false){
+						if(previousTime >= {{video.getLargestTag}}){
+							//THIS OCCURS WHEN THE VIDEO IS DONE PLAYING
+							buffering = false;
+						}
+						else{
+							buffering = true;
+						}
+					}
+					else{
+						buffering = false;
+					}
+					TagString = nextTag.toString();
+					$('.inProgress' + TagString).css("animation-play-state","paused");
+				}
+				else{
+					buffering = false;
+					TagString = nextTag.toString();
+					$('.inProgress' + TagString).css("animation-play-state","running");
+				}
+				console.log("Time previous: " + previousTime);
+				console.log("current time: " + nextTime);
+				if(pausedVideo == true){
+					console.log("status: Paused");
+					$('#loader-wrapper').fadeOut(100);
+				}
+				else if(pausedVideo == false){
+					if(buffering == true){
+						console.log("status: Buffering");
+						$('#loader-wrapper').fadeIn(100);
+					}
+					else{
+						console.log("status: Playing")
+						$('#loader-wrapper').fadeOut(100);
+					}
+				}
+				console.log('');
+			}, 1)
+
+			
+		}, 50);
+
+
+		//CLICKING THE VIDEO ITSElF TOGGLES THE PLAY STATE OF THE VIDEO HERE
+		$('#clickCatch').on("click", function() {
+
+			player.getPaused().then(function(paused){
+				if(paused){
+					player.play();
+					pausedVideo = false;
+					console.log('video is playing');
+					TagString = nextTag.toString();
+					$('.inProgress' + TagString).css("animation-play-state","running");
+					console.log('animation is running');
+				}
+				else{
+					player.pause();
+					pausedVideo = true;
+					console.log('video is paused');
+					TagString = nextTag.toString();
+					$('.inProgress' + TagString).css("animation-play-state","paused");
+					console.log('animation is paused');
+				}
+			}).catch(function(error){
+				console.log("an error occured with pausing the video");
+				console.log(error);
+			});
+		});
+
+		//CLICKING THE TAGS PAUSES THE VIDEO
+		{% for tag in tagList %}{% if '1' in tag.title %}
+		$('#tag{{forloop.counter}}').on("click", function(){
+
+			previousTag = nextTag;
+			nextTag = {{forloop.counter}};
+			console.log("tag{{forloop.counter}} was clicked");
+			if (nextTag == previousTag){
+				//play pause the video
+				player.getPaused().then(function(paused){
+					if(paused){
+						player.play();
+						pausedVideo = false;
+						console.log('video is playing');
+						TagString = nextTag.toString();
+						$('.inProgress' + TagString).css("animation-play-state","running");
+					}
+					else{
+						player.pause();
+						pausedVideo = true;
+						console.log('video is paused');
+						TagString = nextTag.toString();
+						$('.inProgress' + TagString).css("animation-play-state","paused");
+					}
+				}).catch(function(error){
+					console.log("an error occured with pausing the video")
+				});
+			}
+			else {
+				//PAUSE THE PREVIOUS TAG AND REMOVE ACTIVE STATUS
+				TagString = previousTag.toString();
+				$('.inProgress' + TagString).css("animation-play-state","paused");
+				$('#fill' + TagString).removeClass('active');
+				$('#tag' + TagString).removeClass('activeTag');
+				//ADD ACTIVE STATUS TO next
+				TagString = nextTag.toString();
+				$('#fill' + TagString).addClass('active');
+				$('#tag' + TagString).addClass('activeTag');
+				//remove the animation in order to reset the animation
+				$('#progressAnimation' + TagString).removeClass('inProgress' + TagString);
+
+				setTimeout(function(){
+					//seek to new spot
+					player.setCurrentTime({{tag.start}}).then(function(seconds) {
+						console.log('successfully seeked to ' + seconds);
+						player.getPaused().then(function(paused){
+						    //AFTER SEEKING TO NEW SPOT
+						    TagString = nextTag.toString();
+						    $('#progressAnimation' + TagString).addClass('inProgress' + TagString);
+						    if(paused){
+						    	//if the video was previously paused, then pause the animation
+								$('.inProgress' + TagString).css("animation-play-state","paused");
+						    }
+						    else{
+						    	//if the video was previously playing, then play the animation
+								$('.inProgress' + TagString).css("animation-play-state","running");
+						    }
+						    
+						});
+					}).catch(function(error) {
+						console.log('an error occured with seeking in the video');
+					});
+				},1);
+
+				
+			}
+		});
+
+		//FINISHING THE ANIMATION ON ONE FILL STARTS THE ANIMATION ON THE NEXT
+		$('.inProgress{{forloop.counter}}').on('animationend webkitAnimationEnd oAnimationEnd',   
+	    	function(e) {
+	    		console.log("the animation for the {{forloop.counter}} tag is done");
+	    		//start the next box
+	    		if( {{forloop.counter|add:1}} <= maxPlayingTags){
+	    			previousTag = nextTag;
+	    			nextTag = {{forloop.counter|add:1}};
+
+					TagString = nextTag.toString();
+					$('.inProgress' + TagString).css("animation-play-state","running");
+					$('#fill' + TagString).addClass('active');
+					$('#tag' + TagString).addClass('activeTag');
+
+					TagString = previousTag.toString();
+					$('.inProgress' + TagString).css("animation-play-state","paused");
+					$('#fill' + TagString).removeClass('active');
+					$('#tag' + TagString).removeClass('activeTag');
+	    	 	}
+	    	 	else{
+	    	 		//THIS LINE OF CODE RUNS RIGHT AFTER ALL THE TAGS FINISH
+	    	 		console.log('video has finished');
+	    	 	}
+	  	});	
+	  	{% endif %}{% endfor %}
+
+	});
+
+	</script>
+
+
+
+
+</body>
+</html>
