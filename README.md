@@ -18,5 +18,6 @@ localhost:8000/admin - Navigates to the Django Admin Panel
 
 tested with:
 
+![](https://github.com/Johnny-Zou/Bootkik-Video-code/blob/master/mysite/uploads/img/admin%20Panel.png)
 
 localhost:8000/videos/testing/1 - loads the template that has video pk=1
